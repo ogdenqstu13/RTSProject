@@ -56,20 +56,20 @@ public class RTSPlayer : NetworkBehaviour
     {
         if(!isClientOnly){return;}
 
-        Unit.AuthorityOnUnitSpawned += AuthorityHandleUnitSpawned;
-        Unit.AuthorityOnUnitDespawned += AuthorityHandleUnitDespawned;
+        Unit.AuthorityOnUnitSpawned -= AuthorityHandleUnitSpawned;
+        Unit.AuthorityOnUnitDespawned -= AuthorityHandleUnitDespawned;
     }
 
     private void AuthorityHandleUnitSpawned(Unit unit)
     {
-        if(hasAuthority) {return;}
+        if(!hasAuthority) {return;}
 
         myUnits.Add(unit);
     }
 
     private void AuthorityHandleUnitDespawned(Unit unit)
     {
-        if(hasAuthority) {return;}
+        if(!hasAuthority) {return;}
 
         myUnits.Remove(unit);
     }
