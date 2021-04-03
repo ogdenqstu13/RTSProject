@@ -22,10 +22,13 @@ public class UnitSelectionHandler : MonoBehaviour
         player = NetworkClient.connection.identity.GetComponent<RTSPlayer>();
 
         Unit.AuthorityOnUnitDespawned += AuthorityHandleUnitDespawn;
+        GameOverHandler.ClientOnGameOver += ClientHandleGameOver;
     }
 
     private void OnDestroy() {
         Unit.AuthorityOnUnitDespawned -= AuthorityHandleUnitDespawn;
+        GameOverHandler.ClientOnGameOver -= ClientHandleGameOver;
+
     }
 
     private void Update() {
@@ -130,5 +133,10 @@ public class UnitSelectionHandler : MonoBehaviour
      private void AuthorityHandleUnitDespawn(Unit unit)
     {
         SelectedUnits.Remove(unit);
+    }
+
+    private void ClientHandleGameOver(string obj)
+    {
+        enabled = false;
     }
 }

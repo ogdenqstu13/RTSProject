@@ -1,3 +1,4 @@
+using System;
 using System.Collections;
 using System.Collections.Generic;
 using Mirror;
@@ -15,6 +16,16 @@ public class Targeter : NetworkBehaviour
 
     #region Server
 
+    public override void OnStartServer()
+    {
+        GameOverHandler.ServerOnGameOver += ServerHandleGameOver;
+    }
+
+    public override void OnStopServer()
+    {
+        GameOverHandler.ServerOnGameOver -= ServerHandleGameOver;
+    }
+
     [Command]
     public void CmdSetTarget(GameObject targetGameObject)
     {
@@ -27,6 +38,11 @@ public class Targeter : NetworkBehaviour
     public void ClearTarget()
     {
         target = null;
+    }
+
+    private void ServerHandleGameOver()
+    {
+        ClearTarget();
     }
 
     #endregion
