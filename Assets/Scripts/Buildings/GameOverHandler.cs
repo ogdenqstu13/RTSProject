@@ -33,6 +33,8 @@ public class GameOverHandler : NetworkBehaviour
     [Server]
     private void ServerHandleBaseDespawned(UnitBase unitBase)
     {
+        if (this == null) { return; }
+
         bases.Remove(unitBase);
 
         if (bases.Count != 1) { return; }

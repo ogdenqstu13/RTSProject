@@ -2,14 +2,48 @@ using System;
 using System.Collections;
 using System.Collections.Generic;
 using Mirror;
+using TMPro;
 using UnityEngine;
 using UnityEngine.EventSystems;
+using UnityEngine.UI;
 
 public class UnitSpawner : NetworkBehaviour, IPointerClickHandler
 {
     [SerializeField] private Health health = null;
-    [SerializeField] private GameObject unitPrefab = null;
+    [SerializeField] private Unit unitPrefab = null;
     [SerializeField] private Transform unitSpawnPoint;
+    [SerializeField] private TMP_Text remainingUnitsText = null;
+    [SerializeField] private Image unitProgressImage = null;
+    [SerializeField] private GameObject unitSpawningCanvas = null;
+    [SerializeField] private int maxUnitQueue = 5;
+    [SerializeField] private float spawnMoveRange = 7f;
+    [SerializeField] private float unitSpawnDuration = 5f;
+
+    [SyncVar(hook = nameof(ClientHandleQueuedUnitsUpdated))]
+    private int queuedUnits;
+    [SyncVar]
+    private float unitTimer;
+
+    private float progressImageVelocity;
+
+    private void Start() 
+    {
+        unitSpawningCanvas.SetActive(false);
+    }
+
+    private void Update() 
+    {
+        if(isServer)
+        {
+            ProduceUnits();
+        }
+        if(isClient)
+        {
+            UpdateTimerDisplay();
+        }
+    }
+
+    
 
     #region Server
 
@@ -24,6 +58,32 @@ public class UnitSpawner : NetworkBehaviour, IPointerClickHandler
     }
 
     [Server]
+    private void ProduceUnits()
+    {
+        if(queuedUnits == 0) {return;}
+
+        unitTimer += Time.deltaTime;
+
+        if(unitTimer < unitSpawnDuration){return;}
+
+        GameObject unitInstance = Instantiate(
+            unitPrefab.gameObject, 
+            unitSpawnPoint.position, 
+            unitSpawnPoint.rotation);
+
+        NetworkServer.Spawn(unitInstance, connectionToClient);
+
+        Vector3 spawnOffset = UnityEngine.Random.insideUnitSphere * spawnMoveRange;
+        spawnOffset.y = unitSpawnPoint.position.y;
+
+        UnitMovement unitMovement = unitInstance.GetComponent<UnitMovement>();
+        unitMovement.ServerMove(unitSpawnPoint.position + spawnOffset);
+
+        queuedUnits--;
+        unitTimer = 0f;
+    }
+
+    [Server]
     private void ServerHandleDie()
     {
         NetworkServer.Destroy(gameObject);
@@ -32,17 +92,46 @@ public class UnitSpawner : NetworkBehaviour, IPointerClickHandler
     [Command]
     private void CmdSpawnUnit()
     {
-        GameObject unitInstance = Instantiate(
-            unitPrefab, 
-            unitSpawnPoint.position, 
-            unitSpawnPoint.rotation);
+        if(queuedUnits == maxUnitQueue){return;}
 
-        NetworkServer.Spawn(unitInstance, connectionToClient);
+        RTSPlayer player = connectionToClient.identity.GetComponent<RTSPlayer>();
+
+        if(player.GetMyResources() < unitPrefab.GetResourceCost()){return;}
+
+        queuedUnits++;
+
+        player.SetMyResources(player.GetMyResources() - unitPrefab.GetResourceCost());
     }
 
     #endregion
 
     #region Client
+
+    private void UpdateTimerDisplay()
+    {
+        if(queuedUnits == 0){
+            unitSpawningCanvas.SetActive(false);
+        }
+        else{
+            unitSpawningCanvas.SetActive(true);
+        }
+
+        float newProgress = unitTimer / unitSpawnDuration;
+
+        if(newProgress < unitProgressImage.fillAmount)
+        {
+            unitProgressImage.fillAmount = newProgress;
+        }
+        else
+        {
+            unitProgressImage.fillAmount = Mathf.SmoothDamp(
+                unitProgressImage.fillAmount, 
+                newProgress,
+                ref progressImageVelocity,
+                0.1f
+            );
+        }
+    }
 
     public void OnPointerClick(PointerEventData eventData)
     {
@@ -51,6 +140,11 @@ public class UnitSpawner : NetworkBehaviour, IPointerClickHandler
         if(!hasAuthority){return;}
 
         CmdSpawnUnit();
+    }
+
+    private void ClientHandleQueuedUnitsUpdated(int oldUnits, int newUnits)
+    {
+        remainingUnitsText.text = newUnits.ToString();
     }
 
     #endregion
